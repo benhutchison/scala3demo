@@ -34,6 +34,7 @@ object RGBColor {
   opaque type RGBColor = Int
 
   private val MaskLowByte = 255
+  private val MaxVal = 255
 
   private def inclusiveRange(n: Int, label: String, max: Int, min: Int = 0) = 
     Validated.cond(n <= max && n >= min, n, s"$label outside valid range [$min, $max]: $n. ")
@@ -44,9 +45,9 @@ object RGBColor {
   def apply(r: Int, g: Int, b: Int): Either[String, RGBColor] = 
     //https://dotty.epfl.ch/docs/reference/other-new-features/parameter-untupling.html
     (
-      inclusiveRange(r, "Red", 255),
-      inclusiveRange(g, "Green", 255),
-      inclusiveRange(b, "Blue", 255),
+      inclusiveRange(r, "Red", MaxVal),
+      inclusiveRange(g, "Green", MaxVal),
+      inclusiveRange(b, "Blue", MaxVal),
     ).mapN(applyValid).toEither
 
   def (c: RGBColor) toString = s"RGBColor($red, $green, $blue)"
@@ -55,13 +56,16 @@ object RGBColor {
   def (c: RGBColor) green: Int = c >> 8 & MaskLowByte
   def (c: RGBColor) blue: Int = c & MaskLowByte
 
-  def (c: RGBColor) redF: Double = c.red.toDouble / 255
-  def (c: RGBColor) greenF: Double = c.green.toDouble / 255
-  def (c: RGBColor) blueF: Double = c.blue.toDouble / 255
+  def (c: RGBColor) redF: Double = c.red.toDouble / MaxVal
+  def (c: RGBColor) greenF: Double = c.green.toDouble / MaxVal
+  def (c: RGBColor) blueF: Double = c.blue.toDouble / MaxVal
 
   given as Ordering[RGBColor] given (a: Ordering[Int]) = a
 
-  @alpha("scale") def * (n: Double): RGBColor = ???
+  private def clamp(n: Double, max: Int, min: Int = 0): Int = math.min(math.max(n.toInt, min), max)
+
+  @alpha("scale") def (c: RGBColor) * (n: Double): RGBColor = 
+    applyValid(clamp(c.red * n, MaxVal), clamp(c.green * n, MaxVal), clamp(c.blue * n, MaxVal))
 
   def (c: RGBColor) toHSVColor: HSVColor.HSVColor = {
     val r: Double = c.redF
@@ -201,11 +205,18 @@ object Email {
 
 case class User(name: Username, email: Email)
 
-def forgotPassword(id: Username | Email): Either[String, User] = id match {
+type UserNotFound = UsernameNotFound | EmailNotFound
+def forgotPassword(id: Username | Email): Either[UserNotFound, User] = id match {
   case username: Username => lookupUser(username)
   case email: Email => lookupUserByEmail(email)
 }
 
-def lookupUser(u: Username): Either[String, User] = ???
+def lookupUser(u: Username): Either[UsernameNotFound, User] = ???
 
-def lookupUserByEmail(email: Email): Either[String, User] = ???
+def lookupUserByEmail(email: Email): Either[EmailNotFound, User] = ???
+
+case class UsernameNotFound(u: Username)
+case class EmailNotFound(e: Email)
+
+
+
